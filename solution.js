@@ -1,4 +1,4 @@
-function intersects(fig1, fig2) {
+function intersect(fig1, fig2) {
     var poly1 = createPolygon(fig1, fig2),
         poly2 = createPolygon(fig2, fig1),
         isIntersection = addIntersection(poly1, poly2);
@@ -22,7 +22,7 @@ function intersects(fig1, fig2) {
             fnod.visited = true;
             var nod = fnod.next;
             var isSecondFigure = false;
-            var isBack = null; 
+            var isBack = null;
             while (!nod.visited){
                 // switch figure if is intersection and next node go outside
                 if (nod.same && !isGoInside(isBack && isSecondFigure? nod.prev : nod, isSecondFigure ? fig1 : fig2)) {
