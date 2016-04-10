@@ -1,72 +1,90 @@
 function intersects(fig1, fig2) {
-    var lfig1 = createPolygon(fig1, fig2),
-        lfig2 = createPolygon(fig2, fig1);
-        var isIntersection = addIntersection(lfig1, lfig2);
+    var poly1 = createPolygon(fig1, fig2),
+        poly2 = createPolygon(fig2, fig1),
+        isIntersection = addIntersection(poly1, poly2);
 
-    var isInside = true;
-    lfig1.foreach(function (nod) {
-        if (nod.isInside === false && !nod.same)
-            isInside = false;
-    });
-    if (isInside === true)
+    if (isPolyInside(poly1))
         return [fig1];
-    isInside = true;
-    lfig2.foreach(function (nod) {
-        if (nod.isInside === false  && !nod.same)
-            isInside = false;
-    });
-    if (isInside === true)
+    if (isPolyInside(poly2))
         return [fig2];
     if (!isIntersection)
         return [];
 
     var result = [];
-    lfig1.foreach(function (fnod) {
-        if (fnod.same && fnod.prev.isInside === false && (fnod.next.isInside || fnod.next.same || fnod.next.same) && !fnod.visited){
+
+    poly1.foreach(function (fnod) { //walk through polygon nodes and get intersections
+        if (fnod.same && fnod.prev.isInside === false && (fnod.next.isInside || fnod.next.same) && !fnod.visited){
             var poly = [];
-            poly.push({x: fnod.value.x, y: fnod.value.y});
+            poly.push(new Dot(fnod.value.x, fnod.value.y));
             fnod.visited = true;
             var nod = fnod.next;
+            var isSecondFigure = false;
+            var isBack = null;
             while (!nod.visited){
                 if (nod.same) {
                     nod.visited = true;
-                    nod = nod.same;
+                    nod = nod.same; isSecondFigure = !isSecondFigure; //switch figure
+                    if (nod.visited) break;
+                    if (isSecondFigure && isBack === null){
+                        isBack = isBackDirection(nod, fig1);
+                    }
                 }
-                if (!nod.visited)
-                    poly.push({x: nod.value.x, y: nod.value.y});
+
+                poly.push(new Dot(nod.value.x, nod.value.y));
                 nod.visited = true;
 
-                nod = nod.next;
+                nod = isSecondFigure && isBack ? nod.prev :nod.next;
             }
             result.push(poly);
         }
     });
 
+    for(var i = 0; i < result.length; i++){
+        if (Math.abs(getArea(result[i])) < 0.0001){
+            result.splice(i, 1);
+        }
+    }
+
     return result;
 
 }
 
+
+function isBackDirection(dot, poly) {
+    var middleDot = new Dot((dot.value.x + dot.next.value.x)/2, (dot.value.y + dot.next.value.y)/2);
+    return !isDotInFigure(middleDot, poly);
+}
+
+function isPolyInside(poly) {
+    var isInside = true;
+    poly.foreach(function (nod) {
+        if (nod.isInside === false && !nod.same)
+            isInside = false;
+    });
+    return isInside;
+}
+
 function addIntersection(poly1, poly2) {
     var isIntersection = false;
-    poly1.foreach(function (f1p) {
-        poly2.foreach(function (f2p) {
-            var newDot = checkLineIntersection(f1p.value, f1p.next.value, f2p.value, f2p.next.value);
+    poly1.foreach(function (dot1) {
+        poly2.foreach(function (dot2) {
+            var newDot = checkLineIntersection(dot1.value, dot1.next.value, dot2.value, dot2.next.value);
 
             if (newDot != null){
                 var nod1, nod2;
-                if (f1p.value.x == newDot.x && f1p.value.y == newDot.y){
-                    nod1 = f1p;
-                } else if (f1p.next.value.x == newDot.x && f1p.next.value.y == newDot.y){
-                    nod1 = f1p.next;
+                if (dot1.value.equals(newDot)){
+                    nod1 = dot1;
+                } else if (dot1.next.value.equals(newDot)){
+                    nod1 = dot1.next;
                 } else {
-                    nod1 = poly1.insert(f1p, newDot);
+                    nod1 = poly1.insert(dot1, newDot);
                 }
-                if (f2p.value.x == newDot.x && f2p.value.y == newDot.y){
-                    nod2 = f2p;
-                } else if (f2p.next.value.x == newDot.x && f2p.next.value.y == newDot.y){
-                    nod2 = f2p.next;
+                if (dot2.value.equals(newDot)){
+                    nod2 = dot2;
+                } else if (dot2.next.value.equals(newDot)){
+                    nod2 = dot2.next;
                 } else {
-                    nod2 = poly2.insert(f2p, newDot);
+                    nod2 = poly2.insert(dot2, newDot);
                 }
                 nod1.same = nod2; nod2.same = nod1;
                 isIntersection = true;
@@ -77,40 +95,32 @@ function addIntersection(poly1, poly2) {
 }
 
 function createPolygon(fig1, fig2) {
-    var fd = new DoublyCircularList();
-    if (isClockwise(fig1)) {
-        for (var i = 0; i < fig1.length; i++) {
-            fd.add(fig1[i]).isInside = isDotInPolygon(fig1[i], fig2);
-        }
-    } else {
-        for (var i = fig1.length - 1; i >= 0; i--) {
-            fd.add(fig1[i]).isInside = isDotInPolygon(fig1[i], fig2);
-        }
+    var result = new DoublyCircularList();
+    for (var i = 0; i < fig1.length; i++) {
+        result.add(new Dot(fig1[i].x, fig1[i].y)).isInside = isDotInFigure(fig1[i], fig2);
     }
-    return fd;
+    return result;
 }
 
-function isDotInPolygon(dot, polygon){
-  var npol = polygon.length;
-  var j = npol - 1;
-  var c = false;
-  for (var i = 0; i < npol; i++){
-      if ((((polygon[i].y<=dot.y) && (dot.y<polygon[j].y)) || ((polygon[j].y<=dot.y) && (dot.y<polygon[i].y))) &&
-      (dot.x > (polygon[j].x - polygon[i].x) * (dot.y - polygon[i].y) / (polygon[j].y - polygon[i].y) + polygon[i].x)) {
-       c = !c
-       }
-       j = i;
-  }
-return c;
+function isDotInFigure(dot, figure){
+    var npol = figure.length;
+    var j = npol - 1;
+    var c = false;
+    for (var i = 0; i < npol; i++){
+        if ((((figure[i].y<=dot.y) && (dot.y<figure[j].y)) || ((figure[j].y<=dot.y) && (dot.y<figure[i].y))) &&
+        (dot.x > (figure[j].x - figure[i].x) * (dot.y - figure[i].y) / (figure[j].y - figure[i].y) + figure[i].x)) {
+            c = !c;
+        }
+        j = i;
+    }
+    return c;
 }
 
 
 
 function checkLineIntersection(dot1Start, dot1End, dot2Start, dot2End) {
-  var denominator, a, b, numerator1, numerator2, result = {
-    x: null,
-    y: null
-  };
+  var denominator, a, b, numerator1, numerator2,
+      result = new Dot(null, null);
   denominator = ((dot2End.y - dot2Start.y) * (dot1End.x - dot1Start.x)) - ((dot2End.x - dot2Start.x) * (dot1End.y - dot1Start.y));
   if (denominator == 0) {
     return null;
@@ -122,6 +132,7 @@ function checkLineIntersection(dot1Start, dot1End, dot2Start, dot2End) {
   a = numerator1 / denominator;
   b = numerator2 / denominator;
 
+
   result.x = dot1Start.x + (a * (dot1End.x - dot1Start.x));
   result.y = dot1Start.y + (a * (dot1End.y - dot1Start.y));
 
@@ -131,13 +142,13 @@ function checkLineIntersection(dot1Start, dot1End, dot2Start, dot2End) {
     return null;
 }
 
-function isClockwise(fig) {
+function getArea(fig) {
     var result = 0;
     for (var i = 0; i < fig.length-1; i++){
         result+=((fig[i+1].x - fig[i].x) * (fig[i+1].y + fig[i].y));
     }
     result+=((fig[fig.length-1].x - fig[0].x) * (fig[fig.length-1].y + fig[0].y));
-    return result > 0;
+    return result / 2;
 }
 
 //############# DoublyCircularList
@@ -220,9 +231,9 @@ function testIsDotInPolygon() {
         {x: 100, y: 100},
         {x: 100, y: 0}
     ];
-    assert(isDotInPolygon({x: 50, y: 50}, poly), true);
-    assert(isDotInPolygon({x: 500, y: 500}, poly), false);
-    assert(isDotInPolygon({x: 0, y: 0}, poly), false);
+    assert(isDotInFigure({x: 50, y: 50}, poly), true);
+    assert(isDotInFigure({x: 500, y: 500}, poly), false);
+    assert(isDotInFigure({x: 0, y: 0}, poly), false);
 
     poly = [
         {x: 0, y: 0},
@@ -231,8 +242,8 @@ function testIsDotInPolygon() {
         {x: 100, y: 100},
         {x: 100, y: 0}
     ];
-    assert(isDotInPolygon({x: 50, y: 101}, poly), false);
-    assert(isDotInPolygon({x: 50, y: 99}, poly), true);
+    assert(isDotInFigure({x: 50, y: 101}, poly), false);
+    assert(isDotInFigure({x: 50, y: 99}, poly), true);
 }
 
 function testDoublyCircularList() {
@@ -251,17 +262,17 @@ function testDoublyCircularList() {
 
 function testAddIntersection() {
     var lfig1 = new DoublyCircularList();
-    lfig1.add({x: 0, y: 0});
-    lfig1.add({x: 100, y: 0});
-    lfig1.add({x: 100, y: 100});
-    lfig1.add({x: 0, y: 100});
+    lfig1.add(new Dot(0, 0));
+    lfig1.add(new Dot(100, 0));
+    lfig1.add(new Dot(100, 100));
+    lfig1.add(new Dot(0, 100));
 
 
     var lfig2 = new DoublyCircularList();
-    lfig2.add({x: 50, y: 50});
-    lfig2.add({x: 150, y: 50});
-    lfig2.add({x: 150, y: 150});
-    lfig2.add({x: 50, y: 150});
+    lfig2.add(new Dot(50, 50));
+    lfig2.add(new Dot(150, 50));
+    lfig2.add(new Dot(150, 150));
+    lfig2.add(new Dot(50, 150));
 
     addIntersection(lfig1, lfig2);
     var dot = lfig1.get(2).value;
