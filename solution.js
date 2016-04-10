@@ -12,7 +12,10 @@ function intersects(fig1, fig2) {
 
     var result = [];
 
-    poly1.foreach(function (fnod) { //walk through polygon nodes and get intersections
+
+    //walk through polygon nodes and get intersections
+    // poly1 aways in forward direction, poly2 check direction
+    poly1.foreach(function (fnod) {
         if (fnod.same && fnod.prev.isInside === false && (fnod.next.isInside || fnod.next.same) && !fnod.visited){
             var poly = [];
             poly.push(new Dot(fnod.value.x, fnod.value.y));
@@ -21,12 +24,13 @@ function intersects(fig1, fig2) {
             var isSecondFigure = false;
             var isBack = null;
             while (!nod.visited){
-                if (nod.same) {
+                // switch figure if is intersection and next node go outside
+                if (nod.same && !isGoInside(isBack && isSecondFigure? nod.prev : nod, isSecondFigure ? fig1 : fig2)) {
                     nod.visited = true;
                     nod = nod.same; isSecondFigure = !isSecondFigure; //switch figure
                     if (nod.visited) break;
                     if (isSecondFigure && isBack === null){
-                        isBack = isBackDirection(nod, fig1);
+                        isBack = !isGoInside(nod, fig1);
                     }
                 }
 
@@ -50,9 +54,9 @@ function intersects(fig1, fig2) {
 }
 
 
-function isBackDirection(dot, poly) {
+function isGoInside(dot, poly) {
     var middleDot = new Dot((dot.value.x + dot.next.value.x)/2, (dot.value.y + dot.next.value.y)/2);
-    return !isDotInFigure(middleDot, poly);
+    return isDotInFigure(middleDot, poly);
 }
 
 function isPolyInside(poly) {
