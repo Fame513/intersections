@@ -1,4 +1,4 @@
-function intersects(fig1, fig2) {
+function intersect(fig1, fig2) {
     var poly1 = createPolygon(fig1, fig2),
         poly2 = createPolygon(fig2, fig1),
         isIntersection = addIntersection(poly1, poly2);
